@@ -1,0 +1,69 @@
+version: '3.7'
+
+services:
+  ldapmanager:
+    image: osixia/openldap
+    command: ["--copy-service","--loglevel","debug"]
+    volumes:
+      - "/var/lib/ldap"
+      - "/etc/ldap/slapd.d"
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  saslauthd:
+    image: dweomer/saslauthd
+    command: ["-a","ldap","-d","1"]
+    privileged: true
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    # volumes:
+    #   - "mutex:/var/run/saslauthd/mux"
+    configs:
+      - source: saslauthd
+        target: /etc/saslauthd.conf
+        mode: 0440
+    depends_on:
+      - ldapmanager
+
+  ldap:
+    image: osixia/openldap
+    command: ["--copy-service","--loglevel","debug"]
+    ports:
+      - "389:389"
+      - "636:636"
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    # volumes_from: 
+    #   - saslauthd
+    volumes:
+      # - "mutex:/var/run/saslauthd/mux"
+      - "/var/lib/ldap"
+      - "/etc/ldap/slapd.d"
+    # configs:
+    #   - source: sasl2ldap
+    #     target: /usr/lib/sasl2/slapd.conf
+    #     mode: 0440
+    depends_on:
+      - saslauthd
+
+configs:
+  saslauthd:
+    file: ./saslauthd.conf
+  sasl2ldap:
+    file: ./sasl2ldap.conf
+  # configldap:
+  #   file: ./configldap.ldif
+    
+volumes:
+   mutex:
+
+  
